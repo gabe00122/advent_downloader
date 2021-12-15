@@ -15,6 +15,7 @@ fn main() {
     let current_year = chrono::Utc::now().year();
     let current_year_str = format!("{}", current_year);
 
+    // TODO: Option to download range of days
     let matches = App::new("Advent Downloader")
         .version("0.1")
         .author("Gabriel Keith")
@@ -60,8 +61,6 @@ fn main() {
                                 Path::new("input").join(&dir_name).join(&file_name)
                             };
 
-                            // TODO: Option to create director if it doesn't exist
-
                             if let Err(error) = fs::write(&path, &result) {
                                 eprintln!("Failed to write to {} because {}", path.display(), error);
                             }
@@ -90,7 +89,7 @@ fn main() {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct StatusCodeError {
     status: u16,
 }
