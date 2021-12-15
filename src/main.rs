@@ -1,6 +1,6 @@
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fmt;
 use std::error;
 use bytes::Bytes;
@@ -15,7 +15,7 @@ fn main() {
     let current_year = chrono::Utc::now().year();
     let current_year_str = format!("{}", current_year);
 
-    let marches = App::new("Advent Downloader")
+    let matches = App::new("Advent Downloader")
         .version("0.1")
         .author("Gabriel Keith")
         .about("Downloads advent of code input")
@@ -44,22 +44,26 @@ fn main() {
 
     match (
         env::var("ADVENT_SESSION"),
-        marches.value_of("day").unwrap().parse::<u32>(),
-        marches.value_of("year").unwrap().parse::<u32>(),
+        matches.value_of("day").unwrap().parse::<u32>(),
+        matches.value_of("year").unwrap().parse::<u32>(),
     ) {
         (Ok(session), Ok(day), Ok(year)) => {
             match create_client(&session) {
                 Ok(client) => {
-
                     match download(&client, day, year) {
                         Ok(result) => {
-                            let dir_name = format!("year{}", year);
-                            let file_name = format!("day{}.txt", day);
-                            let path = Path::new("input").join(&dir_name).join(&file_name);
+                            let path = if let Some(path) = matches.value_of("output") {
+                                PathBuf::from(path)
+                            } else {
+                                let dir_name = format!("year{}", year);
+                                let file_name = format!("day{}.txt", day);
+                                Path::new("input").join(&dir_name).join(&file_name)
+                            };
+
                             // TODO: Option to create director if it doesn't exist
 
                             if let Err(error) = fs::write(&path, &result) {
-                                eprintln!("Failed to write to file because: {}", error);
+                                eprintln!("Failed to write to {} because {}", path.display(), error);
                             }
                         }
                         Err(error) => {
