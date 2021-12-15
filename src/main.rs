@@ -49,7 +49,7 @@ fn main() {
             match download(&session, day, year) {
                 Ok(result) => {
                     let dir_name = format!("year{}", year);
-                    let file_name = format!("day{}", day);
+                    let file_name = format!("day{}.txt", day);
                     let path = Path::new("input").join(&dir_name).join(&file_name);
                     // TODO: Option to create director if it doesn't exist
 
