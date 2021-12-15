@@ -1,10 +1,14 @@
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::fmt;
+use std::error;
+use bytes::Bytes;
 
 use chrono::Datelike;
 use clap::{App, Arg};
-use reqwest::header;
+
+use reqwest::header::{HeaderValue, HeaderMap};
 use reqwest::blocking::Client;
 
 fn main() {
@@ -44,29 +48,33 @@ fn main() {
         marches.value_of("year").unwrap().parse::<u32>(),
     ) {
         (Ok(session), Ok(day), Ok(year)) => {
-            // TODO: Apply range validation
+            match create_client(&session) {
+                Ok(client) => {
 
-            match download(&session, day, year) {
-                Ok(result) => {
-                    let dir_name = format!("year{}", year);
-                    let file_name = format!("day{}.txt", day);
-                    let path = Path::new("input").join(&dir_name).join(&file_name);
-                    // TODO: Option to create director if it doesn't exist
+                    match download(&client, day, year) {
+                        Ok(result) => {
+                            let dir_name = format!("year{}", year);
+                            let file_name = format!("day{}.txt", day);
+                            let path = Path::new("input").join(&dir_name).join(&file_name);
+                            // TODO: Option to create director if it doesn't exist
 
-                    if let Err(error) = fs::write(&path, &result) {
-                        eprintln!("Failed to write to file because: {}", error);
+                            if let Err(error) = fs::write(&path, &result) {
+                                eprintln!("Failed to write to file because: {}", error);
+                            }
+                        }
+                        Err(error) => {
+                            eprintln!("Download error: {}", error);
+                        }
                     }
                 }
                 Err(error) => {
-                    eprintln!("Download error: {}", error);
+                    eprintln!("Could not initialize client because: {}", error);
                 }
             }
-
-
         }
         (session, day, year) => {
             if let Err(session) = session {
-                eprintln!("ADVENT_SESSION environment variable not found because: {}", session);
+                eprintln!("ADVENT_SESSION {}", session);
             }
             if let Err(day) = day {
                 eprintln!("Failed to parse day because: {}", day);
@@ -78,21 +86,40 @@ fn main() {
     }
 }
 
-fn download(session: &str, day: u32, year: u32) -> reqwest::Result<String> {
-    let cookies = format!("session={}", session);
-    let url = format!("https://adventofcode.com/{}/day/{}/input", year, day);
+#[derive(Debug, Clone)]
+struct StatusCodeError {
+    status: u16,
+}
 
-    let mut headers = header::HeaderMap::new();
-    headers.insert("Cookie", header::HeaderValue::from_str(&cookies).unwrap()); // TODO: Remove unwrap
-
-    let client = Client::builder()
-        .default_headers(headers)
-        .build()?;
-
-    let response = client.get(&url).send()?;
-    if response.status().is_success() {
-        response.text()
-    } else {
-        Ok(String::from("")) // Some type of error
+impl fmt::Display for StatusCodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "A non-success status code was returned {}", self.status)
     }
+}
+
+impl error::Error for StatusCodeError {}
+
+fn download(client: &Client, day: u32, year: u32) -> Result<Bytes, Box<dyn error::Error>> {
+    let url = format!("https://adventofcode.com/{}/day/{}/input", year, day);
+    let response = client.get(&url).send()?;
+
+    if response.status().is_success() {
+        response.bytes().map_err(|e| e.into())
+    } else {
+        Err(Box::new(StatusCodeError {
+            status: response.status().as_u16()
+        }))
+    }
+}
+
+fn create_client(session: &str) -> Result<Client, Box<dyn error::Error>> {
+    let cookies = format!("session={}", session);
+
+    let mut headers = HeaderMap::new();
+    headers.insert("Cookie",HeaderValue::from_str(&cookies)?);
+
+    Client::builder()
+        .default_headers(headers)
+        .build()
+        .map_err(|e|e.into())
 }
