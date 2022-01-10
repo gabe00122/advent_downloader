@@ -8,6 +8,6 @@ lto = true
 
 [dependencies]
 reqwest = { version = "0.11.7",  features = ["blocking"]}
+clap = { version = "3.0.5", features = ["derive"] }
 bytes = "1.1.0"
-clap = "2.34.0"
 chrono = "0.4"

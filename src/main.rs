@@ -6,54 +6,36 @@ use std::error;
 use bytes::Bytes;
 
 use chrono::Datelike;
-use clap::{App, Arg};
+use clap::Parser;
 
 use reqwest::header::{HeaderValue, HeaderMap};
 use reqwest::blocking::Client;
 
+#[derive(Parser, Debug)]
+#[clap(about, version, author)]
+struct Args {
+    #[clap(short, long)]
+    day: u32,
+    #[clap(short, long)]
+    year: Option<u32>,
+    #[clap(short, long)]
+    output: Option<String>,
+}
+
 fn main() {
-    let current_year = chrono::Utc::now().year();
-    let current_year_str = format!("{}", current_year);
-
     // TODO: Option to download range of days
-    let matches = App::new("Advent Downloader")
-        .version("0.1")
-        .author("Gabriel Keith")
-        .about("Downloads advent of code input")
-        .arg(
-            Arg::with_name("day")
-                .short("d")
-                .long("day")
-                .takes_value(true)
-                .required(true)
-        )
-        .arg(
-            Arg::with_name("year")
-                .short("y")
-                .long("year")
-                .takes_value(true)
-                .default_value(&current_year_str)
-        )
-        .arg(
-            Arg::with_name("output")
-                .long("output")
-                .takes_value(true)
-                .short("o")
-        )
-        .get_matches();
+    let args = Args::parse();
 
+    let day = args.day;
+    let year = args.year.unwrap_or_else(||chrono::Utc::now().year().try_into().unwrap());
 
-    match (
-        env::var("ADVENT_SESSION"),
-        matches.value_of("day").unwrap().parse::<u32>(),
-        matches.value_of("year").unwrap().parse::<u32>(),
-    ) {
-        (Ok(session), Ok(day), Ok(year)) => {
+    match env::var("ADVENT_SESSION") {
+        Ok(session) => {
             match create_client(&session) {
                 Ok(client) => {
                     match download(&client, day, year) {
                         Ok(result) => {
-                            let path = if let Some(path) = matches.value_of("output") {
+                            let path = if let Some(path) = args.output {
                                 PathBuf::from(path)
                             } else {
                                 let dir_name = format!("year{}", year);
@@ -75,16 +57,8 @@ fn main() {
                 }
             }
         }
-        (session, day, year) => {
-            if let Err(session) = session {
-                eprintln!("ADVENT_SESSION {}", session);
-            }
-            if let Err(day) = day {
-                eprintln!("Failed to parse day because: {}", day);
-            }
-            if let Err(year) = year {
-                eprintln!("Failed to parse year because: {}", year);
-            }
+        Err(error) => {
+            eprintln!("ADVENT_SESSION {}", error);
         }
     }
 }
@@ -119,10 +93,10 @@ fn create_client(session: &str) -> Result<Client, Box<dyn error::Error>> {
     let cookies = format!("session={}", session);
 
     let mut headers = HeaderMap::new();
-    headers.insert("Cookie",HeaderValue::from_str(&cookies)?);
+    headers.insert("Cookie", HeaderValue::from_str(&cookies)?);
 
     Client::builder()
         .default_headers(headers)
         .build()
-        .map_err(|e|e.into())
+        .map_err(|e| e.into())
 }
