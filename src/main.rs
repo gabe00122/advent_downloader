@@ -43,8 +43,16 @@ fn main() {
                                 Path::new("input").join(&dir_name).join(&file_name)
                             };
 
-                            if let Err(error) = fs::write(&path, &result) {
-                                eprintln!("Failed to write to {} because {}", path.display(), error);
+                            if let Some(parent) = path.parent() {
+                                if let Err(error) = fs::create_dir_all(parent) {
+                                    eprintln!("Failed to create directory {} because {}", parent.display(), error);
+                                } else {
+                                    if let Err(error) = fs::write(&path, &result) {
+                                        eprintln!("Failed to write to {} because {}", path.display(), error);
+                                    }
+                                }
+                            } else {
+                                eprintln!("No parent directory.");
                             }
                         }
                         Err(error) => {
